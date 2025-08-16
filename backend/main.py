@@ -213,6 +213,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 import groq
 import resend
+import base64 
 from typing import Literal
 from io import BytesIO
 from docx import Document
@@ -296,17 +297,21 @@ async def share_summary(request: ShareRequest):
 
         if request.format == "pdf":
             pdf_bytes = create_pdf_from_text(request.summary)
+            # --- THIS IS THE FIX ---
+            encoded_content = base64.b64encode(pdf_bytes.getvalue()).decode('utf-8')
             attachments.append({
                 "filename": "summary.pdf",
-                "content": pdf_bytes.getvalue()
+                "content": encoded_content
             })
         elif request.format == "docx":
             docx_bytes = create_docx_from_text(request.summary)
+            # --- THIS IS THE FIX ---
+            encoded_content = base64.b64encode(docx_bytes.getvalue()).decode('utf-8')
             attachments.append({
                 "filename": "summary.docx",
-                "content": docx_bytes.getvalue()
+                "content": encoded_content
             })
-        else:
+        else: # Plaintext
             html_content = f"<p>Here is the summary you requested:</p><pre>{request.summary}</pre>"
 
         params = {
@@ -319,8 +324,9 @@ async def share_summary(request: ShareRequest):
         
         email = resend.Emails.send(params)
         
-        # --- THIS IS THE CORRECTED LINE ---
         return {"message": "Email sent successfully!"}
         
     except Exception as e:
+        # We can also add a print here to see errors clearly in the terminal
+        print(f"ERROR in /api/share: {e}") 
         raise HTTPException(status_code=500, detail=str(e))
